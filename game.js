@@ -120,14 +120,22 @@ let camera = {
   x: 0
 };
 
-// Pipes with snakes
+// Pipes with snakes (waitUntil tracks when snake can pop back up)
 let pipes = [
-  { x: 280, y: 300, width: 50, height: 50, snakeOut: 0, snakeDirection: 1, snakeSpeed: 0.03 },
-  { x: 600, y: 300, width: 50, height: 50, snakeOut: 0.5, snakeDirection: 1, snakeSpeed: 0.04 },
-  { x: 1000, y: 300, width: 50, height: 50, snakeOut: 0.3, snakeDirection: 1, snakeSpeed: 0.035 },
-  { x: 1450, y: 300, width: 50, height: 50, snakeOut: 0.7, snakeDirection: 1, snakeSpeed: 0.045 },
-  { x: 1850, y: 300, width: 50, height: 50, snakeOut: 0.2, snakeDirection: 1, snakeSpeed: 0.03 }
+  { x: 280, y: 300, width: 50, height: 50, snakeOut: 0, snakeDirection: 1, snakeSpeed: 0.03, waitUntil: 0 },
+  { x: 600, y: 300, width: 50, height: 50, snakeOut: 0.5, snakeDirection: 1, snakeSpeed: 0.04, waitUntil: 0 },
+  { x: 1000, y: 300, width: 50, height: 50, snakeOut: 0.3, snakeDirection: 1, snakeSpeed: 0.035, waitUntil: 0 },
+  { x: 1450, y: 300, width: 50, height: 50, snakeOut: 0.7, snakeDirection: 1, snakeSpeed: 0.045, waitUntil: 0 },
+  { x: 1850, y: 300, width: 50, height: 50, snakeOut: 0.2, snakeDirection: 1, snakeSpeed: 0.03, waitUntil: 0 }
 ];
+
+// Detect touch device and add appropriate class to body
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+if (isTouchDevice) {
+  document.body.classList.add('touch-device');
+} else {
+  document.body.classList.add('no-touch');
+}
 
 // Event listeners
 document.addEventListener('keydown', (e) => {
@@ -359,13 +367,22 @@ function update() {
 
   // Update pipes and snakes
   pipes.forEach(pipe => {
+    const now = Date.now();
+
+    // If waiting, check if wait time is over
+    if (pipe.waitUntil > now) {
+      return; // Still waiting, skip this pipe
+    }
+
     // Snake moves up and down
     pipe.snakeOut += pipe.snakeSpeed * pipe.snakeDirection;
 
     if (pipe.snakeOut >= 1) {
       pipe.snakeDirection = -1;
     } else if (pipe.snakeOut <= 0) {
+      pipe.snakeOut = 0;
       pipe.snakeDirection = 1;
+      pipe.waitUntil = now + 5000; // Wait 5 seconds before popping back up
     }
 
     // Check collision with snake (only when snake is out)

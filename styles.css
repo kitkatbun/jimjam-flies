@@ -7,15 +7,20 @@
   user-select: none;
 }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   min-height: 100vh;
-  min-height: -webkit-fill-available;
+  min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  overflow: hidden;
 }
 
 .game-container {
@@ -23,28 +28,31 @@ body {
   width: 100%;
   max-width: 800px;
   padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 h1 {
   color: #ffd700;
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  text-shadow: 3px 3px 0 #ff6b6b, 6px 6px 0 rgba(0,0,0,0.2);
+  font-size: clamp(1.2rem, 5vw, 2.5rem);
+  margin-bottom: 0.3rem;
+  text-shadow: 2px 2px 0 #ff6b6b, 4px 4px 0 rgba(0,0,0,0.2);
 }
 
 .game-info {
   display: flex;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
   background: rgba(0,0,0,0.3);
   border-radius: 10px 10px 0 0;
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
 }
 
 .game-info span {
   color: #fff;
-  font-size: 1.2rem;
+  font-size: clamp(0.8rem, 3vw, 1.2rem);
   font-weight: bold;
 }
 
@@ -59,136 +67,138 @@ h1 {
 canvas {
   display: block;
   background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 60%, #ff4500 60%, #ff2200 100%);
-  border: 4px solid #4a4a6a;
-  border-radius: 0 0 10px 10px;
-  max-width: 100%;
-  height: auto;
+  border: 3px solid #4a4a6a;
+  border-top: none;
+  width: 100%;
+  max-width: 800px;
   touch-action: none;
 }
 
 .controls-info {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   color: #94a3b8;
+  font-size: 0.9rem;
 }
 
 .controls-info p {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
 }
 
 button {
   background: #ff6b6b;
   color: white;
   border: none;
-  padding: 0.75rem 2rem;
+  padding: 0.6rem 1.5rem;
   font-size: 1rem;
   border-radius: 25px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   font-weight: bold;
   margin-top: 0.5rem;
 }
 
 button:hover {
   background: #ee5a5a;
-  transform: scale(1.05);
 }
 
-/* Touch Controls */
+/* Touch Controls - visible by default, hidden on desktop via JS */
 .touch-controls {
-  display: none;
+  display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  margin-top: 0.5rem;
+  width: 100%;
+  max-width: 800px;
+  padding: 0.8rem 0.5rem;
+  gap: 1rem;
 }
 
-.touch-left, .touch-right {
+.touch-left {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.8rem;
+}
+
+.touch-right {
+  display: flex;
 }
 
 .touch-btn {
-  width: 70px;
-  height: 70px;
+  width: clamp(55px, 15vw, 75px);
+  height: clamp(55px, 15vw, 75px);
   border-radius: 50%;
-  font-size: 1.5rem;
+  font-size: clamp(1.2rem, 4vw, 1.8rem);
   padding: 0;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(107, 76, 154, 0.8);
+  background: rgba(107, 76, 154, 0.9);
   border: 3px solid #9d7cc7;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .touch-btn:active {
-  transform: scale(0.95);
-  background: rgba(107, 76, 154, 1);
+  transform: scale(0.9);
+  background: #6b4c9a;
 }
 
 .jump-btn {
-  width: 90px;
-  height: 90px;
-  font-size: 1.2rem;
-  background: rgba(74, 222, 128, 0.8);
+  width: clamp(70px, 20vw, 95px);
+  height: clamp(70px, 20vw, 95px);
+  font-size: clamp(0.9rem, 3vw, 1.3rem);
+  background: rgba(74, 222, 128, 0.9);
   border-color: #86efac;
 }
 
 .jump-btn:active {
-  background: rgba(74, 222, 128, 1);
+  background: #4ade80;
 }
 
-/* Mobile styles */
-@media (max-width: 850px) {
-  h1 {
-    font-size: 1.8rem;
-  }
-
-  .game-info span {
-    font-size: 1rem;
-  }
-
-  .desktop-only {
-    display: none;
-  }
-
-  .touch-controls {
-    display: flex;
-  }
-
-  canvas {
-    border-radius: 0;
-  }
+/* Desktop - hide touch controls */
+.no-touch .touch-controls {
+  display: none;
 }
 
-@media (max-width: 500px) {
+.no-touch .desktop-only {
+  display: block;
+}
+
+/* Always hide desktop controls on touch devices */
+.touch-device .desktop-only {
+  display: none;
+}
+
+/* Landscape phone optimization */
+@media (max-height: 500px) and (orientation: landscape) {
   h1 {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
+    margin-bottom: 0.2rem;
   }
 
   .game-info {
-    padding: 0.3rem 0.5rem;
-    border-radius: 5px 5px 0 0;
+    padding: 0.2rem 0.5rem;
   }
 
-  .game-info span {
-    font-size: 0.9rem;
+  .game-container {
+    padding: 0.2rem;
+  }
+
+  .touch-controls {
+    padding: 0.3rem;
   }
 
   .touch-btn {
-    width: 60px;
-    height: 60px;
-    font-size: 1.3rem;
+    width: 50px;
+    height: 50px;
   }
 
   .jump-btn {
-    width: 75px;
-    height: 75px;
-    font-size: 1rem;
+    width: 60px;
+    height: 60px;
   }
 
   #restart {
-    padding: 0.5rem 1.5rem;
-    font-size: 0.9rem;
+    padding: 0.3rem 1rem;
+    font-size: 0.8rem;
   }
 }
