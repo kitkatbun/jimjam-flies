@@ -145,6 +145,48 @@ document.addEventListener('keyup', (e) => {
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.jump = false;
 });
 
+// Touch controls for mobile
+const touchLeft = document.getElementById('touch-left');
+const touchRight = document.getElementById('touch-right');
+const touchJump = document.getElementById('touch-jump');
+
+if (touchLeft) {
+  touchLeft.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    keys.left = true;
+  });
+  touchLeft.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    keys.left = false;
+  });
+}
+
+if (touchRight) {
+  touchRight.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    keys.right = true;
+  });
+  touchRight.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    keys.right = false;
+  });
+}
+
+if (touchJump) {
+  touchJump.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    keys.jump = true;
+  });
+  touchJump.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    keys.jump = false;
+  });
+}
+
+// Prevent default touch behavior on canvas to avoid scrolling
+canvas.addEventListener('touchstart', (e) => e.preventDefault());
+canvas.addEventListener('touchmove', (e) => e.preventDefault());
+
 restartBtn.addEventListener('click', resetGame);
 
 function resetGame() {

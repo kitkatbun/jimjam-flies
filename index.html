@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>JimJam Flies!</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,10 +16,19 @@
       <span id="status"></span>
     </div>
     <canvas id="game" width="800" height="400"></canvas>
-    <div class="controls-info">
+    <div class="controls-info desktop-only">
       <p><strong>Controls:</strong> Arrow keys or WASD to move, Space to jump</p>
-      <button id="restart">Restart</button>
     </div>
+    <div class="touch-controls">
+      <div class="touch-left">
+        <button id="touch-left" class="touch-btn">&#9664;</button>
+        <button id="touch-right" class="touch-btn">&#9654;</button>
+      </div>
+      <div class="touch-right">
+        <button id="touch-jump" class="touch-btn jump-btn">JUMP</button>
+      </div>
+    </div>
+    <button id="restart">Restart</button>
   </div>
   <script src="game.js"></script>
 </body>
