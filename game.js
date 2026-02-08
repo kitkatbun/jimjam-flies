@@ -8,7 +8,7 @@ const restartBtn = document.getElementById('restart');
 let gameState = 'playing'; // 'playing', 'won', 'levelComplete'
 let coins = 0;
 let currentLevel = 1;
-const MAX_LEVEL = 2;
+const MAX_LEVEL = 3;
 
 // Gravity and physics
 const GRAVITY = 0.5;
@@ -135,6 +135,44 @@ const levelData = {
       { x: 1750, minX: 1650, maxX: 1900, speed: 1.4 }
     ],
     pipes: [] // No pipes in underwater level
+  },
+  3: {
+    name: "Smokey Mountain Trail",
+    platforms: [
+      { x: 0, y: 350, width: LEVEL_WIDTH, height: 50, isFloor: true },
+      { x: 130, y: 280, width: 80, height: 30, isTree: true },
+      { x: 300, y: 220, width: 90, height: 30, isTree: true },
+      { x: 480, y: 260, width: 85, height: 30, isTree: true },
+      { x: 680, y: 190, width: 80, height: 30, isTree: true },
+      { x: 880, y: 240, width: 95, height: 30, isTree: true },
+      { x: 1080, y: 180, width: 80, height: 30, isTree: true },
+      { x: 1280, y: 230, width: 90, height: 30, isTree: true },
+      { x: 1480, y: 170, width: 85, height: 30, isTree: true },
+      { x: 1680, y: 210, width: 80, height: 30, isTree: true },
+      { x: 1880, y: 260, width: 95, height: 30, isTree: true },
+      { x: 2050, y: 300, width: 100, height: 35, isTree: true }
+    ],
+    stars: [
+      { x: 250, y: 250 },
+      { x: 580, y: 160 },
+      { x: 980, y: 210 },
+      { x: 1380, y: 140 },
+      { x: 1780, y: 180 }
+    ],
+    powerups: [
+      { x: 380, y: 180 },
+      { x: 1180, y: 140 },
+      { x: 1580, y: 130 }
+    ],
+    greyhounds: [], // No greyhounds - we have bears!
+    bears: [
+      { x: 200, minX: 100, maxX: 400, speed: 1.0 },
+      { x: 550, minX: 450, maxX: 700, speed: 1.2 },
+      { x: 900, minX: 800, maxX: 1050, speed: 1.1 },
+      { x: 1300, minX: 1200, maxX: 1450, speed: 1.3 },
+      { x: 1700, minX: 1600, maxX: 1850, speed: 1.0 }
+    ],
+    pipes: [] // No pipes in mountain level
   }
 };
 
@@ -145,6 +183,7 @@ let flyingPowerups = [];
 let greyhounds = [];
 let pipes = [];
 let penguins = []; // For level 2
+let bears = []; // For level 3
 
 // Flag (goal)
 let flag = {
@@ -221,6 +260,32 @@ function loadLevel(levelNum) {
   } else {
     penguins = [];
   }
+
+  // Set up bears (level 3 only)
+  if (data.bears && data.bears.length > 0) {
+    bears = data.bears.map(b => ({
+      x: b.x,
+      y: 305,
+      width: 60,
+      height: 45,
+      speed: b.speed,
+      direction: Math.random() > 0.5 ? 1 : -1,
+      minX: b.minX,
+      maxX: b.maxX,
+      alive: true,
+      walkPhase: 0
+    }));
+  } else {
+    bears = [];
+  }
+
+  // Add bounce property to tree platforms
+  platforms.forEach(p => {
+    if (p.isTree) {
+      p.bounceOffset = 0;
+      p.bounceVelocity = 0;
+    }
+  });
 
   // Set up clouds/bubbles
   clouds = [];
@@ -390,14 +455,22 @@ function update() {
   // Platform collision
   jimjam.isOnGround = false;
   platforms.forEach(platform => {
+    // Adjust platform y position for tree bounce
+    const platformY = platform.isTree ? platform.y + (platform.bounceOffset || 0) : platform.y;
+
     if (jimjam.x < platform.x + platform.width &&
         jimjam.x + jimjam.width > platform.x &&
-        jimjam.y + jimjam.height > platform.y &&
-        jimjam.y + jimjam.height < platform.y + platform.height + jimjam.velocityY + 1 &&
+        jimjam.y + jimjam.height > platformY &&
+        jimjam.y + jimjam.height < platformY + platform.height + jimjam.velocityY + 1 &&
         jimjam.velocityY >= 0) {
-      jimjam.y = platform.y - jimjam.height;
+      jimjam.y = platformY - jimjam.height;
       jimjam.velocityY = 0;
       jimjam.isOnGround = true;
+
+      // Trigger tree bounce on landing
+      if (platform.isTree && Math.abs(platform.bounceVelocity) < 0.5) {
+        platform.bounceVelocity = 3; // Start bouncing down
+      }
     }
   });
 
@@ -523,11 +596,66 @@ function update() {
     }
   });
 
-  // Check win condition (reach the blanket fort / submarine)
+  // Update bears (level 3)
+  bears.forEach(bear => {
+    if (!bear.alive) return;
+
+    // Move bear
+    bear.x += bear.speed * bear.direction;
+    bear.walkPhase += 0.15;
+
+    // Reverse direction at boundaries
+    if (bear.x <= bear.minX || bear.x + bear.width >= bear.maxX) {
+      bear.direction *= -1;
+    }
+
+    // Check collision with JimJam
+    if (jimjam.x < bear.x + bear.width &&
+        jimjam.x + jimjam.width > bear.x &&
+        jimjam.y < bear.y + bear.height &&
+        jimjam.y + jimjam.height > bear.y) {
+
+      // Check if JimJam is jumping on top
+      if (jimjam.velocityY > 0 && jimjam.y + jimjam.height < bear.y + bear.height / 2) {
+        // Stomp the bear!
+        bear.alive = false;
+        jimjam.velocityY = JUMP_FORCE / 2;
+        statusDisplay.textContent = 'Boop! Bear belly bounce!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      } else {
+        // Got bear hugged!
+        jimjam.x = 50;
+        jimjam.y = 300;
+        jimjam.velocityY = 0;
+        statusDisplay.textContent = 'Bear hug! Too cuddly!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      }
+    }
+  });
+
+  // Update tree bounces (level 3)
+  platforms.forEach(p => {
+    if (p.isTree) {
+      // Apply spring physics
+      p.bounceVelocity += -p.bounceOffset * 0.3; // Spring force
+      p.bounceVelocity *= 0.85; // Damping
+      p.bounceOffset += p.bounceVelocity;
+    }
+  });
+
+  // Check win condition (reach the blanket fort / submarine / cabin)
   if (jimjam.x + jimjam.width > flag.x) {
     if (currentLevel < MAX_LEVEL) {
       gameState = 'levelComplete';
-      statusDisplay.textContent = 'Level Complete! Get ready to dive!';
+      const messages = {
+        1: 'Level Complete! Time to dive underwater!',
+        2: 'Level Complete! Off to the mountains!'
+      };
+      statusDisplay.textContent = messages[currentLevel] || 'Level Complete!';
       setTimeout(() => {
         nextLevel();
       }, 2000);
@@ -561,7 +689,7 @@ function drawCloud(x, y, size) {
     ctx.arc(x + size * 0.8, y, size * 0.5, 0, Math.PI * 2);
     ctx.arc(x + size * 0.4, y + size * 0.2, size * 0.35, 0, Math.PI * 2);
     ctx.fill();
-  } else {
+  } else if (currentLevel === 2) {
     // Underwater bubble
     const float = Math.sin(Date.now() / 500 + x) * 3;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -576,6 +704,18 @@ function drawCloud(x, y, size) {
     ctx.beginPath();
     ctx.arc(x - size * 0.1, y + float - size * 0.1, size * 0.08, 0, Math.PI * 2);
     ctx.fill();
+  } else {
+    // Flying birds (Level 3)
+    const flap = Math.sin(Date.now() / 150 + x) * 8;
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    // Left wing
+    ctx.moveTo(x - 8, y + flap);
+    ctx.quadraticCurveTo(x - 4, y - 3, x, y);
+    // Right wing
+    ctx.quadraticCurveTo(x + 4, y - 3, x + 8, y + flap);
+    ctx.stroke();
   }
 }
 
@@ -1093,6 +1233,114 @@ function drawGreyhound(dog) {
   }
 }
 
+function drawBear(bear) {
+  if (!bear.alive) return;
+
+  const x = bear.x;
+  const y = bear.y;
+  const dir = bear.direction;
+  const walkOffset = Math.sin(bear.walkPhase) * 3;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.beginPath();
+  ctx.ellipse(x + 30, y + 45, 25, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Back legs
+  ctx.fillStyle = '#2d1810';
+  ctx.beginPath();
+  ctx.ellipse(x + 12, y + 35 - walkOffset, 8, 12, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 48, y + 35 + walkOffset, 8, 12, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Big round body
+  ctx.fillStyle = '#1a1a1a'; // Black bear
+  ctx.beginPath();
+  ctx.ellipse(x + 30, y + 22, 28, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lighter belly patch
+  ctx.fillStyle = '#3d2d20';
+  ctx.beginPath();
+  ctx.ellipse(x + 30, y + 28, 15, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Front legs
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.ellipse(x + 15, y + 38 + walkOffset, 7, 10, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 45, y + 38 - walkOffset, 7, 10, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Head
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.ellipse(x + 30 + dir * 15, y + 5, 14, 12, dir * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Snout
+  ctx.fillStyle = '#3d2d20';
+  ctx.beginPath();
+  ctx.ellipse(x + 30 + dir * 25, y + 8, 8, 6, dir * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Nose
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.ellipse(x + 30 + dir * 30, y + 6, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Nose shine
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.beginPath();
+  ctx.arc(x + 29 + dir * 30, y + 5, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(x + 20 + dir * 10, y - 5, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + 40 + dir * 10, y - 5, 6, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner ears
+  ctx.fillStyle = '#4a3728';
+  ctx.beginPath();
+  ctx.arc(x + 20 + dir * 10, y - 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + 40 + dir * 10, y - 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x + 25 + dir * 18, y + 2, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(x + 26 + dir * 19, y + 2, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Friendly expression - slight smile
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x + 30 + dir * 25, y + 10, 4, 0.2 * Math.PI, 0.8 * Math.PI);
+  ctx.stroke();
+
+  // Little tail
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.ellipse(x + 5 - dir * 5, y + 15, 6, 5, -dir * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawSwordPerson(sp) {
   if (!sp.alive) return;
 
@@ -1416,6 +1664,108 @@ function drawBlanketFort() {
     ctx.font = 'bold 10px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('HOME', x + 50, subY + 8);
+  } else if (currentLevel === 3) {
+    // MOUNTAIN CABIN (Level 3)
+    const cabinY = y + 10;
+
+    // Cabin base/walls
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(x + 10, cabinY + 30, 80, 60);
+
+    // Log texture
+    ctx.strokeStyle = '#5d3a1a';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + 10, cabinY + 35 + i * 12);
+      ctx.lineTo(x + 90, cabinY + 35 + i * 12);
+      ctx.stroke();
+    }
+
+    // Roof
+    ctx.fillStyle = '#4a3728';
+    ctx.beginPath();
+    ctx.moveTo(x, cabinY + 30);
+    ctx.lineTo(x + 50, cabinY - 10);
+    ctx.lineTo(x + 100, cabinY + 30);
+    ctx.closePath();
+    ctx.fill();
+
+    // Roof texture
+    ctx.strokeStyle = '#3d2d20';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + 10 + i * 10, cabinY + 25 - i * 5);
+      ctx.lineTo(x + 90 - i * 10, cabinY + 25 - i * 5);
+      ctx.stroke();
+    }
+
+    // Chimney
+    ctx.fillStyle = '#696969';
+    ctx.fillRect(x + 70, cabinY - 5, 15, 25);
+    // Smoke
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+    for (let i = 0; i < 3; i++) {
+      const smokeY = cabinY - 15 - i * 15 + Math.sin(Date.now() / 300 + i) * 3;
+      const smokeX = x + 77 + Math.sin(Date.now() / 400 + i * 2) * 5;
+      ctx.beginPath();
+      ctx.arc(smokeX, smokeY, 6 + i * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Door
+    ctx.fillStyle = '#5d3a1a';
+    ctx.fillRect(x + 38, cabinY + 55, 24, 35);
+    // Door handle
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.arc(x + 55, cabinY + 75, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Windows
+    ctx.fillStyle = '#fffacd';
+    ctx.fillRect(x + 18, cabinY + 45, 15, 15);
+    ctx.fillRect(x + 67, cabinY + 45, 15, 15);
+    // Window frames
+    ctx.strokeStyle = '#5d3a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 18, cabinY + 45, 15, 15);
+    ctx.strokeRect(x + 67, cabinY + 45, 15, 15);
+    // Window cross
+    ctx.beginPath();
+    ctx.moveTo(x + 25.5, cabinY + 45);
+    ctx.lineTo(x + 25.5, cabinY + 60);
+    ctx.moveTo(x + 18, cabinY + 52.5);
+    ctx.lineTo(x + 33, cabinY + 52.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + 74.5, cabinY + 45);
+    ctx.lineTo(x + 74.5, cabinY + 60);
+    ctx.moveTo(x + 67, cabinY + 52.5);
+    ctx.lineTo(x + 82, cabinY + 52.5);
+    ctx.stroke();
+
+    // Warm glow from windows
+    ctx.fillStyle = 'rgba(255, 200, 100, 0.3)';
+    ctx.beginPath();
+    ctx.arc(x + 25.5, cabinY + 52.5, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + 74.5, cabinY + 52.5, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Welcome mat
+    ctx.fillStyle = '#8b0000';
+    ctx.fillRect(x + 35, cabinY + 88, 30, 8);
+
+    // "CABIN" sign
+    ctx.fillStyle = '#5d3a1a';
+    ctx.fillRect(x + 30, cabinY + 20, 40, 12);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('CABIN', x + 50, cabinY + 29);
   }
 }
 
@@ -1429,14 +1779,61 @@ function draw() {
     // Sky gradient
     gradient.addColorStop(0, '#87CEEB');
     gradient.addColorStop(0.7, '#b0e0e6');
-  } else {
+  } else if (currentLevel === 2) {
     // Underwater gradient
     gradient.addColorStop(0, '#0a4a6e');
     gradient.addColorStop(0.5, '#0d5c7a');
     gradient.addColorStop(1, '#1a3a5c');
+  } else {
+    // Smokey Mountain sky gradient
+    gradient.addColorStop(0, '#5d8aa8');
+    gradient.addColorStop(0.4, '#87CEEB');
+    gradient.addColorStop(0.7, '#b8d4e8');
+    gradient.addColorStop(1, '#c9dfc9');
   }
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Mountain background (Level 3)
+  if (currentLevel === 3) {
+    // Distant misty mountains
+    ctx.fillStyle = '#7a9eb8';
+    ctx.beginPath();
+    ctx.moveTo(0, 250);
+    ctx.lineTo(150, 120);
+    ctx.lineTo(300, 200);
+    ctx.lineTo(450, 100);
+    ctx.lineTo(600, 180);
+    ctx.lineTo(750, 90);
+    ctx.lineTo(900, 170);
+    ctx.lineTo(canvas.width, 130);
+    ctx.lineTo(canvas.width, 400);
+    ctx.lineTo(0, 400);
+    ctx.closePath();
+    ctx.fill();
+
+    // Mid mountains
+    ctx.fillStyle = '#5a7a5a';
+    ctx.beginPath();
+    ctx.moveTo(0, 280);
+    ctx.lineTo(200, 180);
+    ctx.lineTo(350, 240);
+    ctx.lineTo(500, 160);
+    ctx.lineTo(700, 220);
+    ctx.lineTo(canvas.width, 190);
+    ctx.lineTo(canvas.width, 400);
+    ctx.lineTo(0, 400);
+    ctx.closePath();
+    ctx.fill();
+
+    // Smokey mist effect
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = `rgba(200, 210, 220, ${0.15 - i * 0.04})`;
+      ctx.beginPath();
+      ctx.ellipse(200 + i * 250, 200 + i * 20, 200, 40 + i * 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   // Underwater light rays (Level 2)
   if (currentLevel === 2) {
@@ -1521,6 +1918,47 @@ function draw() {
           );
           ctx.fill();
         }
+      } else if (currentLevel === 3) {
+        // MOUNTAIN TRAIL (Level 3)
+        // Dirt path
+        ctx.fillStyle = '#8B7355';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+        // Trail texture - dirt and gravel
+        ctx.fillStyle = '#6B5344';
+        for (let i = 0; i < platform.width; i += 30) {
+          ctx.beginPath();
+          ctx.arc(platform.x + i + Math.random() * 20, platform.y + 5 + Math.random() * 5, 3 + Math.random() * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Grass along edges
+        ctx.fillStyle = '#228B22';
+        for (let i = 0; i < platform.width; i += 15) {
+          // Top grass
+          const grassHeight = 8 + Math.sin(i * 0.5) * 3;
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i, platform.y);
+          ctx.lineTo(platform.x + i + 3, platform.y - grassHeight);
+          ctx.lineTo(platform.x + i + 6, platform.y);
+          ctx.fill();
+        }
+
+        // Small rocks
+        ctx.fillStyle = '#696969';
+        for (let i = 0; i < platform.width; i += 100) {
+          ctx.beginPath();
+          ctx.ellipse(platform.x + i + 50, platform.y + 3, 8, 5, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Trail markers (small wooden posts)
+        for (let i = 200; i < platform.width; i += 400) {
+          ctx.fillStyle = '#5d3a1a';
+          ctx.fillRect(platform.x + i, platform.y - 20, 6, 20);
+          ctx.fillStyle = '#ff6b6b';
+          ctx.fillRect(platform.x + i - 2, platform.y - 25, 10, 8);
+        }
       }
     } else {
       if (currentLevel === 1) {
@@ -1582,6 +2020,59 @@ function draw() {
           ctx.closePath();
           ctx.fill();
         }
+      } else if (currentLevel === 3 && platform.isTree) {
+        // BOUNCY TREE (Level 3)
+        const bounceY = platform.bounceOffset || 0;
+        const treeX = platform.x + platform.width / 2;
+        const treeY = platform.y + bounceY;
+
+        // Tree trunk
+        ctx.fillStyle = '#5d3a1a';
+        ctx.fillRect(treeX - 12, treeY, 24, 60);
+
+        // Trunk texture
+        ctx.strokeStyle = '#4a2d14';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(treeX - 8, treeY + 10 + i * 18);
+          ctx.quadraticCurveTo(treeX, treeY + 15 + i * 18, treeX + 8, treeY + 10 + i * 18);
+          ctx.stroke();
+        }
+
+        // Leafy canopy (multiple layers for fullness)
+        const leafColors = ['#1a5c1a', '#228B22', '#2d8c2d', '#3ca03c'];
+        for (let layer = 0; layer < 3; layer++) {
+          ctx.fillStyle = leafColors[layer];
+          const layerY = treeY - 20 - layer * 25;
+          const layerSize = 35 - layer * 5;
+
+          ctx.beginPath();
+          ctx.moveTo(treeX, layerY - layerSize);
+          ctx.lineTo(treeX - layerSize - 10, layerY + 10);
+          ctx.lineTo(treeX + layerSize + 10, layerY + 10);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Platform (the bouncy branch area)
+        ctx.fillStyle = '#228B22';
+        ctx.beginPath();
+        ctx.ellipse(treeX, treeY + 5, platform.width / 2 + 10, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Leaves detail on platform
+        ctx.fillStyle = '#2d8c2d';
+        for (let i = 0; i < 5; i++) {
+          const leafX = platform.x + 10 + i * (platform.width / 5);
+          ctx.beginPath();
+          ctx.ellipse(leafX, treeY + 2 + Math.sin(i) * 3, 8, 5, i * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (currentLevel === 3) {
+        // Simple platform for level 3 (shouldn't happen, but fallback)
+        ctx.fillStyle = '#228B22';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
       }
     }
   });
@@ -1609,6 +2100,9 @@ function draw() {
 
   // Greyhounds
   greyhounds.forEach(dog => drawGreyhound(dog));
+
+  // Bears (Level 3)
+  bears.forEach(bear => drawBear(bear));
 
   // Pipes with snakes
   pipes.forEach(pipe => drawPipe(pipe));
@@ -1638,7 +2132,7 @@ function draw() {
     ctx.fillStyle = '#fff';
     ctx.font = '24px Arial';
     ctx.fillText(`JimJam & Emu collected ${coins} stars!`, canvas.width / 2, canvas.height / 2 + 20);
-    ctx.fillText('From the fort to the deep sea - adventure complete!', canvas.width / 2, canvas.height / 2 + 55);
+    ctx.fillText('Fort, ocean, and mountains conquered!', canvas.width / 2, canvas.height / 2 + 55);
   }
 
   // Level complete message
