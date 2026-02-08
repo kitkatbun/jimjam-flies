@@ -1593,7 +1593,7 @@ function drawBlanketFort() {
     ctx.font = 'bold 10px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('FORT', x + 50, y + 6);
-  } else {
+  } else if (currentLevel === 2) {
     // SUBMARINE (Level 2)
     const subY = y + 20;
 
@@ -1889,7 +1889,7 @@ function draw() {
         gradient.addColorStop(1, 'rgba(255, 100, 0, 0.4)');
         ctx.fillStyle = gradient;
         ctx.fillRect(platform.x, platform.y - 20, platform.width, 20);
-      } else {
+      } else if (currentLevel === 2) {
         // OCEAN FLOOR (Level 2)
         ctx.fillStyle = '#1a3a5c';
         ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
@@ -1988,7 +1988,7 @@ function draw() {
         ctx.fillStyle = '#3d2a54';
         ctx.fillRect(platform.x + 5, platform.y + platform.height, 6, 8);
         ctx.fillRect(platform.x + platform.width - 11, platform.y + platform.height, 6, 8);
-      } else {
+      } else if (currentLevel === 2) {
         // ICE BLOCK (Level 2)
         // Main ice block
         ctx.fillStyle = '#a8d8ea';
