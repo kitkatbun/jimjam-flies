@@ -653,7 +653,7 @@ function update() {
       gameState = 'levelComplete';
       const messages = {
         1: 'Level Complete! Time to dive underwater!',
-        2: 'Level Complete! Off to the mountains!'
+        2: 'Level Complete! Time to go hiking in the Smokeys!'
       };
       statusDisplay.textContent = messages[currentLevel] || 'Level Complete!';
       setTimeout(() => {
