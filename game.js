@@ -2147,7 +2147,11 @@ function draw() {
 
     ctx.fillStyle = '#fff';
     ctx.font = '24px Arial';
-    ctx.fillText('Time to dive underwater!', canvas.width / 2, canvas.height / 2 + 20);
+    const levelMessages = {
+      1: 'Time to dive underwater!',
+      2: 'Time to go hiking in the Smokeys!'
+    };
+    ctx.fillText(levelMessages[currentLevel] || 'Get ready!', canvas.width / 2, canvas.height / 2 + 20);
   }
 }
 
