@@ -8,7 +8,7 @@ const restartBtn = document.getElementById('restart');
 let gameState = 'playing'; // 'playing', 'won', 'levelComplete'
 let coins = 0;
 let currentLevel = 1;
-const MAX_LEVEL = 3;
+const MAX_LEVEL = 5;
 
 // Gravity and physics
 const GRAVITY = 0.5;
@@ -173,11 +173,99 @@ const levelData = {
       { x: 1700, minX: 1600, maxX: 1850, speed: 1.0 }
     ],
     pipes: [] // No pipes in mountain level
+  },
+  4: {
+    name: "Carlsbad Caverns",
+    platforms: [
+      { x: 0, y: 350, width: LEVEL_WIDTH, height: 50, isFloor: true },
+      // Stalagmites (from floor) and stalactites (from ceiling)
+      { x: 150, y: 290, width: 60, height: 25, isStalagmite: true },
+      { x: 320, y: 100, width: 50, height: 25, isStalactite: true },
+      { x: 450, y: 270, width: 70, height: 25, isStalagmite: true },
+      { x: 600, y: 120, width: 55, height: 25, isStalactite: true },
+      { x: 750, y: 250, width: 65, height: 25, isStalagmite: true },
+      { x: 900, y: 90, width: 60, height: 25, isStalactite: true },
+      { x: 1050, y: 280, width: 70, height: 25, isStalagmite: true },
+      { x: 1200, y: 110, width: 50, height: 25, isStalactite: true },
+      { x: 1350, y: 260, width: 65, height: 25, isStalagmite: true },
+      { x: 1500, y: 100, width: 55, height: 25, isStalactite: true },
+      { x: 1650, y: 240, width: 70, height: 25, isStalagmite: true },
+      { x: 1800, y: 130, width: 60, height: 25, isStalactite: true },
+      { x: 1950, y: 270, width: 65, height: 25, isStalagmite: true },
+      { x: 2050, y: 300, width: 80, height: 30, isStalagmite: true }
+    ],
+    stars: [
+      { x: 250, y: 260 },
+      { x: 550, y: 90 },
+      { x: 850, y: 220 },
+      { x: 1250, y: 80 },
+      { x: 1750, y: 200 }
+    ],
+    powerups: [
+      { x: 400, y: 230 },
+      { x: 1000, y: 60 },
+      { x: 1550, y: 70 }
+    ],
+    greyhounds: [],
+    bears: [],
+    bats: [
+      { x: 300, y: 140, speed: 2, direction: 1 },
+      { x: 900, y: 180, speed: 2.5, direction: -1 },
+      { x: 1500, y: 120, speed: 2, direction: 1 },
+      { x: 1900, y: 160, speed: 2.5, direction: -1 }
+    ],
+    pipes: []
+  },
+  // Level 5: White Sands
+  5: {
+    name: "White Sands",
+    platforms: [
+      { x: 0, y: 350, width: LEVEL_WIDTH, height: 50, isFloor: true },
+      // Sand dunes to jump on
+      { x: 150, y: 300, width: 100, height: 50, isDune: true },
+      { x: 350, y: 270, width: 80, height: 80, isDune: true },
+      { x: 550, y: 290, width: 90, height: 60, isDune: true },
+      // Yucca plants
+      { x: 700, y: 280, width: 40, height: 70, isYucca: true },
+      { x: 900, y: 250, width: 120, height: 100, isDune: true },
+      { x: 1100, y: 280, width: 40, height: 70, isYucca: true },
+      { x: 1250, y: 260, width: 100, height: 90, isDune: true },
+      { x: 1450, y: 290, width: 80, height: 60, isDune: true },
+      { x: 1600, y: 270, width: 40, height: 80, isYucca: true },
+      { x: 1750, y: 250, width: 110, height: 100, isDune: true },
+      { x: 1950, y: 280, width: 90, height: 70, isDune: true }
+    ],
+    stars: [
+      { x: 200, y: 260 },
+      { x: 580, y: 250 },
+      { x: 950, y: 200 },
+      { x: 1300, y: 210 },
+      { x: 1800, y: 200 }
+    ],
+    powerups: [
+      { x: 400, y: 220 },
+      { x: 1130, y: 230 },
+      { x: 1630, y: 220 }
+    ],
+    greyhounds: [],
+    bears: [],
+    bats: [],
+    aliens: [
+      { x: 300, minX: 200, maxX: 500, speed: 1 },
+      { x: 700, minX: 600, maxX: 900, speed: 1.2 },
+      { x: 1100, minX: 1000, maxX: 1300, speed: 0.9 },
+      { x: 1500, minX: 1400, maxX: 1700, speed: 1.1 },
+      { x: 1900, minX: 1800, maxX: 2050, speed: 1 }
+    ],
+    pipes: []
   }
 };
 
 // Active level data (populated by loadLevel)
 let platforms = [];
+let bats = []; // For level 4
+let aliens = []; // For level 5
+let tractorBeam = null; // For level 5 UFO hazard
 let stars = [];
 let flyingPowerups = [];
 let greyhounds = [];
@@ -279,9 +367,57 @@ function loadLevel(levelNum) {
     bears = [];
   }
 
-  // Add bounce property to tree platforms
+  // Set up bats (level 4 only)
+  if (data.bats && data.bats.length > 0) {
+    bats = data.bats.map(b => ({
+      x: b.x,
+      y: b.y,
+      baseY: b.y,
+      width: 40,
+      height: 30,
+      speed: b.speed,
+      direction: b.direction,
+      alive: true,
+      wingPhase: Math.random() * Math.PI * 2,
+      wobblePhase: Math.random() * Math.PI * 2
+    }));
+  } else {
+    bats = [];
+  }
+
+  // Set up aliens (level 5) - ground-based like greyhounds
+  if (data.aliens && data.aliens.length > 0) {
+    aliens = data.aliens.map(a => ({
+      x: a.x,
+      y: 310, // Ground level
+      width: 35,
+      height: 40,
+      speed: a.speed,
+      direction: Math.random() > 0.5 ? 1 : -1,
+      minX: a.minX,
+      maxX: a.maxX,
+      alive: true,
+      walkPhase: Math.random() * Math.PI * 2
+    }));
+  } else {
+    aliens = [];
+  }
+
+  // Set up tractor beam (level 5)
+  if (levelNum === 5) {
+    tractorBeam = {
+      active: false,
+      x: 0,
+      timer: 0,
+      nextBeamTime: 300 + Math.random() * 200 // frames until next beam
+    };
+  } else {
+    tractorBeam = null;
+  }
+
+  // Add bounce property to tree platforms and stalactites/stalagmites
   platforms.forEach(p => {
-    if (p.isTree) {
+    if (p.isTree || p.isStalactite || p.isStalagmite) {
       p.bounceOffset = 0;
       p.bounceVelocity = 0;
     }
@@ -455,20 +591,31 @@ function update() {
   // Platform collision
   jimjam.isOnGround = false;
   platforms.forEach(platform => {
-    // Adjust platform y position for tree bounce
-    const platformY = platform.isTree ? platform.y + (platform.bounceOffset || 0) : platform.y;
+    // Adjust platform y position for bouncy platforms
+    const bounceOffset = platform.bounceOffset || 0;
+    let platformY = platform.y;
+    let platformSurfaceY = platform.y;
+
+    if (platform.isTree || platform.isStalagmite) {
+      platformY = platform.y + bounceOffset;
+      platformSurfaceY = platformY;
+    } else if (platform.isStalactite) {
+      // Stalactites hang from ceiling - landing surface is at bottom
+      platformY = platform.y + bounceOffset;
+      platformSurfaceY = platformY + platform.height;
+    }
 
     if (jimjam.x < platform.x + platform.width &&
         jimjam.x + jimjam.width > platform.x &&
-        jimjam.y + jimjam.height > platformY &&
-        jimjam.y + jimjam.height < platformY + platform.height + jimjam.velocityY + 1 &&
+        jimjam.y + jimjam.height > platformSurfaceY &&
+        jimjam.y + jimjam.height < platformSurfaceY + platform.height + jimjam.velocityY + 1 &&
         jimjam.velocityY >= 0) {
-      jimjam.y = platformY - jimjam.height;
+      jimjam.y = platformSurfaceY - jimjam.height;
       jimjam.velocityY = 0;
       jimjam.isOnGround = true;
 
-      // Trigger tree bounce on landing
-      if (platform.isTree && Math.abs(platform.bounceVelocity) < 0.5) {
+      // Trigger bounce on landing
+      if ((platform.isTree || platform.isStalagmite || platform.isStalactite) && Math.abs(platform.bounceVelocity) < 0.5) {
         platform.bounceVelocity = 3; // Start bouncing down
       }
     }
@@ -637,9 +784,139 @@ function update() {
     }
   });
 
-  // Update tree bounces (level 3)
+  // Update bats (level 4) - zip across the screen
+  bats.forEach(bat => {
+    if (!bat.alive) return;
+
+    // Zip horizontally across the screen
+    bat.x += bat.speed * bat.direction;
+    bat.wingPhase += 0.4;
+    bat.wobblePhase += 0.08;
+
+    // Slight vertical wobble as they fly
+    bat.y = bat.baseY + Math.sin(bat.wobblePhase) * 20;
+
+    // Respawn on opposite side when off screen
+    if (bat.direction > 0 && bat.x > LEVEL_WIDTH + 50) {
+      bat.x = -50;
+      bat.baseY = 80 + Math.random() * 180; // Random height between 80-260
+    } else if (bat.direction < 0 && bat.x < -50) {
+      bat.x = LEVEL_WIDTH + 50;
+      bat.baseY = 80 + Math.random() * 180;
+    }
+
+    // Check collision with JimJam
+    if (jimjam.x < bat.x + bat.width &&
+        jimjam.x + jimjam.width > bat.x &&
+        jimjam.y < bat.y + bat.height &&
+        jimjam.y + jimjam.height > bat.y) {
+
+      // Check if JimJam is jumping on top
+      if (jimjam.velocityY > 0 && jimjam.y + jimjam.height < bat.y + bat.height / 2) {
+        // Stomp the bat!
+        bat.alive = false;
+        jimjam.velocityY = JUMP_FORCE / 2;
+        statusDisplay.textContent = 'Boop! Batty bounce!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      } else {
+        // Got swooped by bat!
+        jimjam.x = 50;
+        jimjam.y = 300;
+        jimjam.velocityY = 0;
+        statusDisplay.textContent = 'Eek! Bat swoop!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      }
+    }
+  });
+
+  // Update aliens (level 5) - ground-based patrol like greyhounds
+  aliens.forEach(alien => {
+    if (!alien.alive) return;
+
+    // Walk horizontally
+    alien.x += alien.speed * alien.direction;
+    alien.walkPhase += 0.1;
+
+    // Reverse at patrol boundaries
+    if (alien.x <= alien.minX || alien.x + alien.width >= alien.maxX) {
+      alien.direction *= -1;
+    }
+
+    // Check collision with JimJam
+    if (jimjam.x < alien.x + alien.width &&
+        jimjam.x + jimjam.width > alien.x &&
+        jimjam.y < alien.y + alien.height &&
+        jimjam.y + jimjam.height > alien.y) {
+
+      if (jimjam.velocityY > 0 && jimjam.y + jimjam.height < alien.y + alien.height / 2) {
+        // Stomp the alien!
+        alien.alive = false;
+        jimjam.velocityY = JUMP_FORCE / 2;
+        statusDisplay.textContent = 'Boing! Alien squish!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      } else {
+        // Got zapped by alien!
+        jimjam.x = 50;
+        jimjam.y = 300;
+        jimjam.velocityY = 0;
+        statusDisplay.textContent = 'Zap! Alien encounter!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      }
+    }
+  });
+
+  // Update tractor beam (level 5)
+  if (tractorBeam && currentLevel === 5) {
+    if (!tractorBeam.active) {
+      // Count down to next beam
+      tractorBeam.nextBeamTime--;
+      if (tractorBeam.nextBeamTime <= 0) {
+        // Activate beam at a random position around the visible area
+        tractorBeam.active = true;
+        // Can appear anywhere from 100 pixels behind to 400 ahead of player
+        const offset = -100 + Math.random() * 500;
+        // Keep beam within level bounds
+        tractorBeam.x = Math.max(100, Math.min(LEVEL_WIDTH - 100, jimjam.x + offset));
+        tractorBeam.timer = 120; // Beam lasts 2 seconds
+      }
+    } else {
+      // Beam is active
+      tractorBeam.timer--;
+      if (tractorBeam.timer <= 0) {
+        // Deactivate beam
+        tractorBeam.active = false;
+        tractorBeam.nextBeamTime = 200 + Math.random() * 300;
+      }
+
+      // Check if JimJam is caught in the beam
+      const beamLeft = tractorBeam.x - 40;
+      const beamRight = tractorBeam.x + 40;
+      if (jimjam.x + jimjam.width > beamLeft && jimjam.x < beamRight) {
+        // Caught in the tractor beam!
+        jimjam.x = 50;
+        jimjam.y = 300;
+        jimjam.velocityY = 0;
+        tractorBeam.active = false;
+        tractorBeam.nextBeamTime = 300 + Math.random() * 200;
+        statusDisplay.textContent = 'Abducted! Beam me down!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      }
+    }
+  }
+
+  // Update bounces (trees and stalactites/stalagmites)
   platforms.forEach(p => {
-    if (p.isTree) {
+    if (p.isTree || p.isStalactite || p.isStalagmite) {
       // Apply spring physics
       p.bounceVelocity += -p.bounceOffset * 0.3; // Spring force
       p.bounceVelocity *= 0.85; // Damping
@@ -1341,6 +1618,324 @@ function drawBear(bear) {
   ctx.fill();
 }
 
+function drawBat(bat) {
+  if (!bat.alive) return;
+
+  const x = bat.x;
+  const y = bat.y;
+  const dir = bat.directionX;
+  const wingFlap = Math.sin(bat.wingPhase) * 20;
+
+  // Wings
+  ctx.fillStyle = '#2d2d2d';
+
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(x + 20, y + 15);
+  ctx.quadraticCurveTo(x - 5, y + 5 + wingFlap * 0.5, x - 10, y + wingFlap);
+  ctx.quadraticCurveTo(x - 5, y + 15, x + 5, y + 20);
+  ctx.quadraticCurveTo(x + 10, y + 18, x + 20, y + 15);
+  ctx.fill();
+
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(x + 20, y + 15);
+  ctx.quadraticCurveTo(x + 45, y + 5 - wingFlap * 0.5, x + 50, y - wingFlap);
+  ctx.quadraticCurveTo(x + 45, y + 15, x + 35, y + 20);
+  ctx.quadraticCurveTo(x + 30, y + 18, x + 20, y + 15);
+  ctx.fill();
+
+  // Wing membrane lines
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 1;
+  // Left wing bones
+  ctx.beginPath();
+  ctx.moveTo(x + 15, y + 15);
+  ctx.lineTo(x, y + 5 + wingFlap * 0.3);
+  ctx.moveTo(x + 15, y + 15);
+  ctx.lineTo(x + 5, y + 10 + wingFlap * 0.2);
+  ctx.stroke();
+  // Right wing bones
+  ctx.beginPath();
+  ctx.moveTo(x + 25, y + 15);
+  ctx.lineTo(x + 40, y + 5 - wingFlap * 0.3);
+  ctx.moveTo(x + 25, y + 15);
+  ctx.lineTo(x + 35, y + 10 - wingFlap * 0.2);
+  ctx.stroke();
+
+  // Body
+  ctx.fillStyle = '#3d3d3d';
+  ctx.beginPath();
+  ctx.ellipse(x + 20, y + 18, 10, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Fuzzy chest
+  ctx.fillStyle = '#4a4a4a';
+  ctx.beginPath();
+  ctx.ellipse(x + 20, y + 20, 6, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Head
+  ctx.fillStyle = '#3d3d3d';
+  ctx.beginPath();
+  ctx.ellipse(x + 20, y + 5, 8, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears (pointy!)
+  ctx.fillStyle = '#2d2d2d';
+  ctx.beginPath();
+  ctx.moveTo(x + 12, y + 2);
+  ctx.lineTo(x + 8, y - 8);
+  ctx.lineTo(x + 16, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 28, y + 2);
+  ctx.lineTo(x + 32, y - 8);
+  ctx.lineTo(x + 24, y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner ears
+  ctx.fillStyle = '#ff9999';
+  ctx.beginPath();
+  ctx.moveTo(x + 12, y + 1);
+  ctx.lineTo(x + 10, y - 4);
+  ctx.lineTo(x + 15, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 28, y + 1);
+  ctx.lineTo(x + 30, y - 4);
+  ctx.lineTo(x + 25, y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Eyes (cute and big)
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x + 16, y + 4, 4, 0, Math.PI * 2);
+  ctx.arc(x + 24, y + 4, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(x + 16 + dir, y + 4, 2, 0, Math.PI * 2);
+  ctx.arc(x + 24 + dir, y + 4, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Little nose
+  ctx.fillStyle = '#ff6b6b';
+  ctx.beginPath();
+  ctx.ellipse(x + 20, y + 9, 2, 1.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tiny fangs
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(x + 17, y + 11);
+  ctx.lineTo(x + 18, y + 14);
+  ctx.lineTo(x + 19, y + 11);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 21, y + 11);
+  ctx.lineTo(x + 22, y + 14);
+  ctx.lineTo(x + 23, y + 11);
+  ctx.fill();
+
+  // Little feet
+  ctx.fillStyle = '#2d2d2d';
+  ctx.beginPath();
+  ctx.ellipse(x + 15, y + 28, 3, 4, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 25, y + 28, 3, 4, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawAlien(alien) {
+  if (!alien.alive) return;
+
+  const x = alien.x;
+  const y = alien.y;
+  const dir = alien.direction;
+  const walkBob = Math.sin(alien.walkPhase) * 2;
+  const legOffset = Math.sin(alien.walkPhase) * 5;
+
+  // Subtle glow effect
+  const gradient = ctx.createRadialGradient(x + 17, y + 15, 5, x + 17, y + 15, 25);
+  gradient.addColorStop(0, 'rgba(100, 255, 100, 0.2)');
+  gradient.addColorStop(1, 'rgba(100, 255, 100, 0)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x + 17, y + 15, 25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Little legs (animated)
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x + 12, y + 25);
+  ctx.lineTo(x + 10 + legOffset, y + 38);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + 22, y + 25);
+  ctx.lineTo(x + 24 - legOffset, y + 38);
+  ctx.stroke();
+
+  // Little feet
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath();
+  ctx.ellipse(x + 10 + legOffset, y + 40, 5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 24 - legOffset, y + 40, 5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body (oval, green)
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath();
+  ctx.ellipse(x + 17, y + 18 + walkBob, 10, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body shading
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.ellipse(x + 19, y + 20 + walkBob, 6, 8, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Big head
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath();
+  ctx.ellipse(x + 17, y + walkBob, 14, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Head shading
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.ellipse(x + 19, y + 2 + walkBob, 9, 7, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Big black eyes (looking in direction of movement)
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.ellipse(x + 10 + dir * 2, y - 2 + walkBob, 5, 7, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 24 + dir * 2, y - 2 + walkBob, 5, 7, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eye shine
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.beginPath();
+  ctx.ellipse(x + 8 + dir * 2, y - 5 + walkBob, 2, 2.5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 22 + dir * 2, y - 5 + walkBob, 2, 2.5, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Little arms (swinging with walk)
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 3;
+  // Left arm
+  ctx.beginPath();
+  ctx.moveTo(x + 7, y + 12 + walkBob);
+  ctx.lineTo(x + 2 - legOffset * 0.5, y + 22 + walkBob);
+  ctx.stroke();
+  // Right arm
+  ctx.beginPath();
+  ctx.moveTo(x + 27, y + 12 + walkBob);
+  ctx.lineTo(x + 32 + legOffset * 0.5, y + 22 + walkBob);
+  ctx.stroke();
+
+  // Three fingers on each hand
+  ctx.lineWidth = 2;
+  const leftHandX = x + 2 - legOffset * 0.5;
+  const leftHandY = y + 22 + walkBob;
+  ctx.beginPath();
+  ctx.moveTo(leftHandX, leftHandY);
+  ctx.lineTo(leftHandX - 3, leftHandY + 4);
+  ctx.moveTo(leftHandX, leftHandY);
+  ctx.lineTo(leftHandX, leftHandY + 5);
+  ctx.moveTo(leftHandX, leftHandY);
+  ctx.lineTo(leftHandX + 3, leftHandY + 4);
+  ctx.stroke();
+
+  const rightHandX = x + 32 + legOffset * 0.5;
+  const rightHandY = y + 22 + walkBob;
+  ctx.beginPath();
+  ctx.moveTo(rightHandX, rightHandY);
+  ctx.lineTo(rightHandX - 3, rightHandY + 4);
+  ctx.moveTo(rightHandX, rightHandY);
+  ctx.lineTo(rightHandX, rightHandY + 5);
+  ctx.moveTo(rightHandX, rightHandY);
+  ctx.lineTo(rightHandX + 3, rightHandY + 4);
+  ctx.stroke();
+}
+
+function drawTractorBeam() {
+  if (!tractorBeam || !tractorBeam.active) return;
+
+  const x = tractorBeam.x;
+  const beamWidth = 80;
+  const pulseIntensity = 0.3 + Math.sin(Date.now() / 100) * 0.2;
+
+  // UFO at top
+  const ufoY = -10;
+
+  // Tractor beam light
+  ctx.fillStyle = `rgba(100, 255, 150, ${pulseIntensity})`;
+  ctx.beginPath();
+  ctx.moveTo(x - 20, ufoY + 30);
+  ctx.lineTo(x - beamWidth / 2, 400);
+  ctx.lineTo(x + beamWidth / 2, 400);
+  ctx.lineTo(x + 20, ufoY + 30);
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner brighter beam
+  ctx.fillStyle = `rgba(150, 255, 200, ${pulseIntensity * 0.7})`;
+  ctx.beginPath();
+  ctx.moveTo(x - 10, ufoY + 30);
+  ctx.lineTo(x - beamWidth / 4, 400);
+  ctx.lineTo(x + beamWidth / 4, 400);
+  ctx.lineTo(x + 10, ufoY + 30);
+  ctx.closePath();
+  ctx.fill();
+
+  // Small UFO silhouette at top
+  ctx.fillStyle = '#c0c0c0';
+  ctx.beginPath();
+  ctx.ellipse(x, ufoY + 15, 35, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // UFO dome
+  ctx.fillStyle = 'rgba(150, 255, 200, 0.8)';
+  ctx.beginPath();
+  ctx.ellipse(x, ufoY + 8, 18, 14, 0, Math.PI, 0);
+  ctx.fill();
+
+  // Blinking lights
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const lightX = x + Math.cos(angle) * 30;
+    const lightY = ufoY + 15 + Math.sin(angle) * 7;
+    const lightOn = Math.sin(Date.now() / 80 + i) > 0;
+    ctx.fillStyle = lightOn ? '#ff0000' : '#660000';
+    ctx.beginPath();
+    ctx.arc(lightX, lightY, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Warning text
+  if (Math.sin(Date.now() / 200) > 0) {
+    ctx.fillStyle = 'rgba(255, 100, 100, 0.9)';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠ BEAM! ⚠', x, 50);
+  }
+}
+
 function drawSwordPerson(sp) {
   if (!sp.alive) return;
 
@@ -1766,6 +2361,155 @@ function drawBlanketFort() {
     ctx.font = 'bold 9px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('CABIN', x + 50, cabinY + 29);
+  } else if (currentLevel === 4) {
+    // CAVE EXIT (Level 4) - Light at the end!
+    const exitY = y + 10;
+
+    // Dark cave wall frame
+    ctx.fillStyle = '#2a2420';
+    ctx.fillRect(x - 10, exitY - 20, 120, 120);
+
+    // Glowing exit opening
+    const glowGradient = ctx.createRadialGradient(x + 50, exitY + 40, 10, x + 50, exitY + 40, 60);
+    glowGradient.addColorStop(0, '#fffef0');
+    glowGradient.addColorStop(0.3, '#fff8dc');
+    glowGradient.addColorStop(0.6, '#ffeebb');
+    glowGradient.addColorStop(1, '#ffdd88');
+    ctx.fillStyle = glowGradient;
+    ctx.beginPath();
+    ctx.ellipse(x + 50, exitY + 40, 40, 50, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Light rays streaming out
+    ctx.fillStyle = 'rgba(255, 255, 200, 0.3)';
+    for (let i = 0; i < 5; i++) {
+      const angle = -0.4 + i * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(x + 50, exitY + 40);
+      ctx.lineTo(x + 50 + Math.cos(angle) * 100, exitY + 40 + Math.sin(angle) * 100 - 30);
+      ctx.lineTo(x + 50 + Math.cos(angle + 0.1) * 100, exitY + 40 + Math.sin(angle + 0.1) * 100 - 30);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Rocky cave entrance edges
+    ctx.fillStyle = '#3d3530';
+    // Left edge
+    ctx.beginPath();
+    ctx.moveTo(x, exitY - 20);
+    ctx.lineTo(x + 15, exitY + 10);
+    ctx.lineTo(x + 10, exitY + 50);
+    ctx.lineTo(x + 20, exitY + 90);
+    ctx.lineTo(x, exitY + 100);
+    ctx.closePath();
+    ctx.fill();
+    // Right edge
+    ctx.beginPath();
+    ctx.moveTo(x + 100, exitY - 20);
+    ctx.lineTo(x + 85, exitY + 15);
+    ctx.lineTo(x + 90, exitY + 55);
+    ctx.lineTo(x + 80, exitY + 85);
+    ctx.lineTo(x + 100, exitY + 100);
+    ctx.closePath();
+    ctx.fill();
+
+    // Silhouette of outside (trees/sky hint)
+    ctx.fillStyle = '#88aa88';
+    ctx.beginPath();
+    ctx.moveTo(x + 25, exitY + 70);
+    ctx.lineTo(x + 35, exitY + 40);
+    ctx.lineTo(x + 45, exitY + 70);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 55, exitY + 70);
+    ctx.lineTo(x + 65, exitY + 35);
+    ctx.lineTo(x + 75, exitY + 70);
+    ctx.fill();
+
+    // "EXIT" sign
+    ctx.fillStyle = '#4a4540';
+    ctx.fillRect(x + 30, exitY - 15, 40, 14);
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('EXIT', x + 50, exitY - 4);
+  } else if (currentLevel === 5) {
+    // UFO (Level 5) - Escape ship!
+    const ufoY = y - 30;
+    const hover = Math.sin(Date.now() / 300) * 5;
+
+    // Beam of light
+    ctx.fillStyle = 'rgba(100, 255, 150, 0.2)';
+    ctx.beginPath();
+    ctx.moveTo(x + 30, ufoY + 30 + hover);
+    ctx.lineTo(x - 20, y + 100);
+    ctx.lineTo(x + 120, y + 100);
+    ctx.lineTo(x + 70, ufoY + 30 + hover);
+    ctx.closePath();
+    ctx.fill();
+
+    // UFO glow
+    const glowGradient = ctx.createRadialGradient(x + 50, ufoY + hover, 10, x + 50, ufoY + hover, 60);
+    glowGradient.addColorStop(0, 'rgba(100, 255, 150, 0.4)');
+    glowGradient.addColorStop(1, 'rgba(100, 255, 150, 0)');
+    ctx.fillStyle = glowGradient;
+    ctx.beginPath();
+    ctx.arc(x + 50, ufoY + hover, 60, 0, Math.PI * 2);
+    ctx.fill();
+
+    // UFO body (bottom disc)
+    ctx.fillStyle = '#c0c0c0';
+    ctx.beginPath();
+    ctx.ellipse(x + 50, ufoY + 20 + hover, 45, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // UFO body shading
+    ctx.fillStyle = '#a0a0a0';
+    ctx.beginPath();
+    ctx.ellipse(x + 50, ufoY + 23 + hover, 40, 8, 0, 0, Math.PI);
+    ctx.fill();
+
+    // UFO dome
+    ctx.fillStyle = 'rgba(150, 255, 200, 0.7)';
+    ctx.beginPath();
+    ctx.ellipse(x + 50, ufoY + 10 + hover, 25, 20, 0, Math.PI, 0);
+    ctx.fill();
+
+    // Dome reflection
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(x + 42, ufoY + hover, 8, 10, -0.3, Math.PI, 0);
+    ctx.fill();
+
+    // Lights around edge
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const lightX = x + 50 + Math.cos(angle) * 38;
+      const lightY = ufoY + 20 + hover + Math.sin(angle) * 8;
+      const lightOn = Math.sin(Date.now() / 100 + i) > 0;
+      ctx.fillStyle = lightOn ? '#ffff00' : '#888800';
+      ctx.beginPath();
+      ctx.arc(lightX, lightY, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Landing legs
+    ctx.strokeStyle = '#808080';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + 20, ufoY + 28 + hover);
+    ctx.lineTo(x + 10, ufoY + 50 + hover);
+    ctx.moveTo(x + 80, ufoY + 28 + hover);
+    ctx.lineTo(x + 90, ufoY + 50 + hover);
+    ctx.moveTo(x + 50, ufoY + 30 + hover);
+    ctx.lineTo(x + 50, ufoY + 55 + hover);
+    ctx.stroke();
+
+    // "ESCAPE" text
+    ctx.fillStyle = 'rgba(100, 255, 150, 0.8)';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('ESCAPE!', x + 50, ufoY - 15 + hover);
   }
 }
 
@@ -1784,15 +2528,86 @@ function draw() {
     gradient.addColorStop(0, '#0a4a6e');
     gradient.addColorStop(0.5, '#0d5c7a');
     gradient.addColorStop(1, '#1a3a5c');
-  } else {
+  } else if (currentLevel === 3) {
     // Smokey Mountain sky gradient
     gradient.addColorStop(0, '#5d8aa8');
     gradient.addColorStop(0.4, '#87CEEB');
     gradient.addColorStop(0.7, '#b8d4e8');
     gradient.addColorStop(1, '#c9dfc9');
+  } else if (currentLevel === 4) {
+    // Carlsbad Caverns - dark cave
+    gradient.addColorStop(0, '#1a1a1a');
+    gradient.addColorStop(0.3, '#2d2520');
+    gradient.addColorStop(0.7, '#3d3530');
+    gradient.addColorStop(1, '#2a2420');
+  } else {
+    // White Sands - twilight desert sky
+    gradient.addColorStop(0, '#1a1a3a');
+    gradient.addColorStop(0.3, '#4a3060');
+    gradient.addColorStop(0.5, '#8b4570');
+    gradient.addColorStop(0.7, '#ff7040');
+    gradient.addColorStop(0.85, '#ffaa60');
+    gradient.addColorStop(1, '#ffe4c4');
   }
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // White Sands background (Level 5)
+  if (currentLevel === 5) {
+    // Stars in the twilight sky
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 30; i++) {
+      const starX = (i * 137) % canvas.width;
+      const starY = (i * 73) % (canvas.height * 0.4);
+      const twinkle = 0.5 + Math.sin(Date.now() / 500 + i) * 0.5;
+      ctx.globalAlpha = twinkle * 0.7;
+      ctx.beginPath();
+      ctx.arc(starX, starY, 1 + (i % 3) * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Distant white sand dunes on horizon
+    ctx.fillStyle = 'rgba(255, 250, 240, 0.4)';
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height * 0.75);
+    for (let i = 0; i <= canvas.width; i += 50) {
+      const duneHeight = Math.sin(i * 0.02) * 20 + Math.sin(i * 0.01 + 2) * 30;
+      ctx.lineTo(i, canvas.height * 0.7 + duneHeight);
+    }
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.lineTo(0, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Cave ceiling stalactites background (Level 4)
+  if (currentLevel === 4) {
+    // Draw background stalactites on ceiling
+    ctx.fillStyle = '#3d3530';
+    for (let i = 0; i < 15; i++) {
+      const stalX = i * 150 + 30;
+      const stalHeight = 40 + Math.sin(i * 2) * 20;
+      ctx.beginPath();
+      ctx.moveTo(stalX - 15, 0);
+      ctx.lineTo(stalX, stalHeight);
+      ctx.lineTo(stalX + 15, 0);
+      ctx.fill();
+    }
+
+    // Dim light rays from above
+    for (let i = 0; i < 3; i++) {
+      const rayX = 200 + i * 300;
+      ctx.fillStyle = 'rgba(255, 250, 220, 0.05)';
+      ctx.beginPath();
+      ctx.moveTo(rayX - 20, 0);
+      ctx.lineTo(rayX + 20, 0);
+      ctx.lineTo(rayX + 80, canvas.height);
+      ctx.lineTo(rayX - 80, canvas.height);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
 
   // Mountain background (Level 3)
   if (currentLevel === 3) {
@@ -1856,8 +2671,10 @@ function draw() {
   ctx.save();
   ctx.translate(-camera.x, 0);
 
-  // Clouds (parallax - move slower)
-  clouds.forEach(cloud => drawCloud(cloud.x - camera.x * 0.3 + camera.x, cloud.y, cloud.size));
+  // Clouds (parallax - move slower) - not in cave or desert levels
+  if (currentLevel !== 4 && currentLevel !== 5) {
+    clouds.forEach(cloud => drawCloud(cloud.x - camera.x * 0.3 + camera.x, cloud.y, cloud.size));
+  }
 
   // Platforms
   platforms.forEach(platform => {
@@ -1958,6 +2775,79 @@ function draw() {
           ctx.fillRect(platform.x + i, platform.y - 20, 6, 20);
           ctx.fillStyle = '#ff6b6b';
           ctx.fillRect(platform.x + i - 2, platform.y - 25, 10, 8);
+        }
+      } else if (currentLevel === 4) {
+        // CAVE FLOOR (Level 4)
+        ctx.fillStyle = '#3d3530';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+        // Rocky texture
+        ctx.fillStyle = '#4a4540';
+        for (let i = 0; i < platform.width; i += 25) {
+          ctx.beginPath();
+          ctx.ellipse(platform.x + i + Math.random() * 15, platform.y + 5, 6 + Math.random() * 4, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Small stalagmites growing up
+        ctx.fillStyle = '#5a5550';
+        for (let i = 0; i < platform.width; i += 60) {
+          const miteHeight = 10 + Math.sin(i * 0.3) * 5;
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i + 20, platform.y);
+          ctx.lineTo(platform.x + i + 25, platform.y - miteHeight);
+          ctx.lineTo(platform.x + i + 30, platform.y);
+          ctx.fill();
+        }
+
+        // Mineral deposits / crystals
+        ctx.fillStyle = '#7a8b8b';
+        for (let i = 0; i < platform.width; i += 150) {
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i + 50, platform.y);
+          ctx.lineTo(platform.x + i + 53, platform.y - 8);
+          ctx.lineTo(platform.x + i + 56, platform.y);
+          ctx.fill();
+        }
+      } else if (currentLevel === 5) {
+        // WHITE SAND (Level 5)
+        // Base white sand
+        ctx.fillStyle = '#fff8f0';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+        // Rippled sand pattern
+        ctx.fillStyle = '#f5efe5';
+        for (let i = 0; i < platform.width; i += 30) {
+          const rippleOffset = Math.sin(i * 0.1) * 3;
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i, platform.y + 5 + rippleOffset);
+          ctx.quadraticCurveTo(platform.x + i + 15, platform.y + 2 + rippleOffset, platform.x + i + 30, platform.y + 5 + rippleOffset);
+          ctx.lineTo(platform.x + i + 30, platform.y + 8);
+          ctx.lineTo(platform.x + i, platform.y + 8);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Subtle shadows from ripples
+        ctx.fillStyle = 'rgba(200, 180, 160, 0.3)';
+        for (let i = 0; i < platform.width; i += 60) {
+          ctx.beginPath();
+          ctx.ellipse(platform.x + i + 30, platform.y + 3, 25, 2, 0.1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Small desert plants/twigs
+        ctx.strokeStyle = '#8B7355';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < platform.width; i += 200) {
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i + 80, platform.y);
+          ctx.lineTo(platform.x + i + 82, platform.y - 8);
+          ctx.moveTo(platform.x + i + 82, platform.y - 5);
+          ctx.lineTo(platform.x + i + 78, platform.y - 10);
+          ctx.moveTo(platform.x + i + 82, platform.y - 5);
+          ctx.lineTo(platform.x + i + 86, platform.y - 10);
+          ctx.stroke();
         }
       }
     } else {
@@ -2073,6 +2963,186 @@ function draw() {
         // Simple platform for level 3 (shouldn't happen, but fallback)
         ctx.fillStyle = '#228B22';
         ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+      } else if (currentLevel === 4 && platform.isStalagmite) {
+        // STALAGMITE (growing up from floor) - Level 4
+        const bounceY = platform.bounceOffset || 0;
+        const centerX = platform.x + platform.width / 2;
+        const baseY = platform.y + bounceY;
+
+        // Main stalagmite shape
+        ctx.fillStyle = '#6a6560';
+        ctx.beginPath();
+        ctx.moveTo(platform.x, baseY + platform.height);
+        ctx.lineTo(centerX - 5, baseY - 40);
+        ctx.lineTo(centerX + 5, baseY - 40);
+        ctx.lineTo(platform.x + platform.width, baseY + platform.height);
+        ctx.closePath();
+        ctx.fill();
+
+        // Texture ridges
+        ctx.fillStyle = '#7a7570';
+        ctx.beginPath();
+        ctx.moveTo(platform.x + 10, baseY + platform.height);
+        ctx.lineTo(centerX - 3, baseY - 30);
+        ctx.lineTo(centerX + 3, baseY - 30);
+        ctx.lineTo(platform.x + platform.width - 10, baseY + platform.height);
+        ctx.closePath();
+        ctx.fill();
+
+        // Landing platform area (flat top for bouncing)
+        ctx.fillStyle = '#8a8580';
+        ctx.beginPath();
+        ctx.ellipse(centerX, baseY, platform.width / 2, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Mineral sparkles
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(centerX - 8, baseY - 15, 2, 0, Math.PI * 2);
+        ctx.arc(centerX + 10, baseY - 25, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (currentLevel === 4 && platform.isStalactite) {
+        // STALACTITE (hanging from ceiling) - Level 4
+        const bounceY = platform.bounceOffset || 0;
+        const centerX = platform.x + platform.width / 2;
+        const baseY = platform.y + bounceY;
+
+        // Connection to ceiling
+        ctx.fillStyle = '#5a5550';
+        ctx.fillRect(centerX - 20, 0, 40, baseY - 30);
+
+        // Main stalactite shape (pointing down)
+        ctx.fillStyle = '#6a6560';
+        ctx.beginPath();
+        ctx.moveTo(platform.x, baseY);
+        ctx.lineTo(centerX - 5, baseY + 50);
+        ctx.lineTo(centerX + 5, baseY + 50);
+        ctx.lineTo(platform.x + platform.width, baseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Texture
+        ctx.fillStyle = '#7a7570';
+        ctx.beginPath();
+        ctx.moveTo(platform.x + 8, baseY + 5);
+        ctx.lineTo(centerX - 3, baseY + 40);
+        ctx.lineTo(centerX + 3, baseY + 40);
+        ctx.lineTo(platform.x + platform.width - 8, baseY + 5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Landing platform area (flat bottom for bouncing)
+        ctx.fillStyle = '#8a8580';
+        ctx.beginPath();
+        ctx.ellipse(centerX, baseY + platform.height, platform.width / 2, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Water drip
+        if (Math.random() > 0.98) {
+          ctx.fillStyle = 'rgba(150, 200, 255, 0.6)';
+          ctx.beginPath();
+          ctx.ellipse(centerX, baseY + 55 + Math.random() * 10, 2, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+      } else if (currentLevel === 4) {
+        // Fallback for level 4
+        ctx.fillStyle = '#6a6560';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+      } else if (currentLevel === 5 && platform.isDune) {
+        // SAND DUNE (Level 5)
+        const centerX = platform.x + platform.width / 2;
+        const baseY = platform.y + platform.height;
+
+        // Dune shape (rounded hill)
+        ctx.fillStyle = '#fff8f0';
+        ctx.beginPath();
+        ctx.moveTo(platform.x - 20, baseY);
+        ctx.quadraticCurveTo(platform.x, platform.y - 10, centerX, platform.y);
+        ctx.quadraticCurveTo(platform.x + platform.width, platform.y - 10, platform.x + platform.width + 20, baseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Shadow side of dune
+        ctx.fillStyle = '#f0e8e0';
+        ctx.beginPath();
+        ctx.moveTo(centerX, platform.y);
+        ctx.quadraticCurveTo(platform.x + platform.width - 10, platform.y + 5, platform.x + platform.width + 15, baseY);
+        ctx.lineTo(centerX + 10, baseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Wind ripples on dune
+        ctx.strokeStyle = 'rgba(200, 180, 160, 0.3)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+          const rippleY = platform.y + 5 + i * 8;
+          ctx.beginPath();
+          ctx.moveTo(platform.x + 10 + i * 5, rippleY);
+          ctx.quadraticCurveTo(centerX, rippleY - 3, platform.x + platform.width - 10 - i * 5, rippleY);
+          ctx.stroke();
+        }
+
+      } else if (currentLevel === 5 && platform.isYucca) {
+        // YUCCA PLANT (Level 5)
+        const centerX = platform.x + platform.width / 2;
+        const baseY = platform.y + platform.height;
+
+        // Small sand mound base
+        ctx.fillStyle = '#fff8f0';
+        ctx.beginPath();
+        ctx.ellipse(centerX, baseY, platform.width / 2 + 10, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Trunk
+        ctx.fillStyle = '#8B7355';
+        ctx.fillRect(centerX - 5, platform.y + 10, 10, platform.height - 10);
+
+        // Spiky leaves radiating out
+        ctx.fillStyle = '#4a7c59';
+        for (let i = 0; i < 12; i++) {
+          const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+          const leafLength = 25 + Math.sin(i * 2) * 8;
+          ctx.save();
+          ctx.translate(centerX, platform.y + 5);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(-3, 0);
+          ctx.lineTo(0, -leafLength);
+          ctx.lineTo(3, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Inner lighter leaves
+        ctx.fillStyle = '#5a9c6a';
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2 - Math.PI / 2 + 0.2;
+          const leafLength = 18;
+          ctx.save();
+          ctx.translate(centerX, platform.y + 5);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(-2, 0);
+          ctx.lineTo(0, -leafLength);
+          ctx.lineTo(2, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Platform area (for landing)
+        ctx.fillStyle = 'rgba(74, 124, 89, 0.5)';
+        ctx.beginPath();
+        ctx.ellipse(centerX, platform.y, platform.width / 2 + 5, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (currentLevel === 5) {
+        // Fallback for level 5
+        ctx.fillStyle = '#fff8f0';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
       }
     }
   });
@@ -2104,6 +3174,17 @@ function draw() {
   // Bears (Level 3)
   bears.forEach(bear => drawBear(bear));
 
+  // Bats (Level 4)
+  bats.forEach(bat => drawBat(bat));
+
+  // Aliens (Level 5)
+  aliens.forEach(alien => drawAlien(alien));
+
+  // Tractor beam (Level 5)
+  if (currentLevel === 5) {
+    drawTractorBeam();
+  }
+
   // Pipes with snakes
   pipes.forEach(pipe => drawPipe(pipe));
 
@@ -2132,7 +3213,7 @@ function draw() {
     ctx.fillStyle = '#fff';
     ctx.font = '24px Arial';
     ctx.fillText(`JimJam & Emu collected ${coins} stars!`, canvas.width / 2, canvas.height / 2 + 20);
-    ctx.fillText('Fort, ocean, and mountains conquered!', canvas.width / 2, canvas.height / 2 + 55);
+    ctx.fillText('All adventures complete! You escaped!', canvas.width / 2, canvas.height / 2 + 55);
   }
 
   // Level complete message
@@ -2149,7 +3230,9 @@ function draw() {
     ctx.font = '24px Arial';
     const levelMessages = {
       1: 'Time to dive underwater!',
-      2: 'Time to go hiking in the Smokeys!'
+      2: 'Time to go hiking in the Smokeys!',
+      3: 'Time to explore the caverns!',
+      4: 'Time to visit White Sands!'
     };
     ctx.fillText(levelMessages[currentLevel] || 'Get ready!', canvas.width / 2, canvas.height / 2 + 20);
   }
