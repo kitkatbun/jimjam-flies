@@ -8,7 +8,7 @@ const restartBtn = document.getElementById('restart');
 let gameState = 'playing'; // 'playing', 'won', 'levelComplete'
 let coins = 0;
 let currentLevel = 1;
-const MAX_LEVEL = 5;
+const MAX_LEVEL = 6;
 
 // Gravity and physics
 const GRAVITY = 0.5;
@@ -258,6 +258,55 @@ const levelData = {
       { x: 1900, minX: 1800, maxX: 2050, speed: 1 }
     ],
     pipes: []
+  },
+  6: {
+    name: "Black Hills",
+    platforms: [
+      { x: 0, y: 350, width: LEVEL_WIDTH, height: 50, isFloor: true },
+      { x: 150, y: 290, width: 110, height: 60, isGranite: true },
+      { x: 380, y: 260, width: 90, height: 90, isGranite: true },
+      { x: 550, y: 300, width: 80, height: 50, isGranite: true },
+      { x: 720, y: 250, width: 100, height: 100, isGranite: true },
+      { x: 920, y: 280, width: 85, height: 70, isGranite: true },
+      { x: 1100, y: 240, width: 110, height: 110, isGranite: true },
+      { x: 1300, y: 290, width: 80, height: 60, isGranite: true },
+      { x: 1480, y: 260, width: 95, height: 90, isGranite: true },
+      { x: 1680, y: 280, width: 100, height: 70, isGranite: true },
+      { x: 1880, y: 250, width: 90, height: 100, isGranite: true },
+      { x: 2020, y: 290, width: 80, height: 60, isGranite: true }
+    ],
+    stars: [
+      { x: 200, y: 250 },
+      { x: 600, y: 260 },
+      { x: 970, y: 230 },
+      { x: 1350, y: 240 },
+      { x: 1730, y: 230 }
+    ],
+    powerups: [
+      { x: 430, y: 210 },
+      { x: 1150, y: 190 },
+      { x: 1530, y: 210 }
+    ],
+    greyhounds: [],
+    bears: [],
+    bats: [],
+    aliens: [],
+    pipes: [],
+    bpisonData: [
+      { x: 300, minX: 150, maxX: 550, speed: 0.7 },
+      { x: 800, minX: 650, maxX: 950, speed: 0.8 },
+      { x: 1200, minX: 1050, maxX: 1400, speed: 0.6 },
+      { x: 1600, minX: 1450, maxX: 1750, speed: 0.75 },
+      { x: 1950, minX: 1800, maxX: 2080, speed: 0.7 }
+    ],
+    prairieDogsData: [
+      { x: 250 },
+      { x: 500 },
+      { x: 850 },
+      { x: 1150 },
+      { x: 1500 },
+      { x: 1850 }
+    ]
   }
 };
 
@@ -272,6 +321,8 @@ let greyhounds = [];
 let pipes = [];
 let penguins = []; // For level 2
 let bears = []; // For level 3
+let bison = []; // For level 6
+let prairieDogs = []; // For level 6
 
 // Flag (goal)
 let flag = {
@@ -401,6 +452,41 @@ function loadLevel(levelNum) {
     }));
   } else {
     aliens = [];
+  }
+
+  // Set up bison (level 6)
+  if (data.bpisonData && data.bpisonData.length > 0) {
+    bison = data.bpisonData.map(b => ({
+      x: b.x,
+      y: 300,
+      width: 70,
+      height: 50,
+      speed: b.speed,
+      direction: Math.random() > 0.5 ? 1 : -1,
+      minX: b.minX,
+      maxX: b.maxX,
+      alive: true,
+      walkPhase: 0
+    }));
+  } else {
+    bison = [];
+  }
+
+  // Set up prairie dogs (level 6) - pop out of ground holes
+  if (data.prairieDogsData && data.prairieDogsData.length > 0) {
+    prairieDogs = data.prairieDogsData.map((p, i) => ({
+      x: p.x,
+      y: 320,
+      width: 25,
+      height: 30,
+      popOut: 0,
+      popDirection: 0,
+      popSpeed: 0.02 + Math.random() * 0.01,
+      waitUntil: Date.now() + i * 2000 + Math.random() * 3000,
+      isUp: false
+    }));
+  } else {
+    prairieDogs = [];
   }
 
   // Set up tractor beam (level 5)
@@ -873,6 +959,89 @@ function update() {
     }
   });
 
+  // Update bison (level 6) - heavy ground patrol
+  bison.forEach(b => {
+    if (!b.alive) return;
+
+    b.x += b.speed * b.direction;
+    b.walkPhase += 0.1;
+
+    if (b.x <= b.minX || b.x + b.width >= b.maxX) {
+      b.direction *= -1;
+    }
+
+    if (jimjam.x < b.x + b.width &&
+        jimjam.x + jimjam.width > b.x &&
+        jimjam.y < b.y + b.height &&
+        jimjam.y + jimjam.height > b.y) {
+
+      if (jimjam.velocityY > 0 && jimjam.y + jimjam.height < b.y + b.height / 2) {
+        b.alive = false;
+        jimjam.velocityY = JUMP_FORCE / 2;
+        statusDisplay.textContent = 'Boop! Buffalo bounce!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      } else {
+        jimjam.x = 50;
+        jimjam.y = 300;
+        jimjam.velocityY = 0;
+        statusDisplay.textContent = 'Stampede! Bison charge!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      }
+    }
+  });
+
+  // Update prairie dogs (level 6) - pop out of ground randomly
+  prairieDogs.forEach(pd => {
+    const now = Date.now();
+
+    if (pd.waitUntil > now) {
+      return;
+    }
+
+    if (pd.popDirection === 0) {
+      pd.popDirection = 1;
+    }
+
+    pd.popOut += pd.popSpeed * pd.popDirection;
+
+    if (pd.popOut >= 1) {
+      pd.popOut = 1;
+      pd.popDirection = 0;
+      pd.isUp = true;
+      setTimeout(() => {
+        pd.popDirection = -1;
+      }, 1500 + Math.random() * 2000);
+    } else if (pd.popOut <= 0) {
+      pd.popOut = 0;
+      pd.popDirection = 0;
+      pd.isUp = false;
+      pd.waitUntil = now + 3000 + Math.random() * 5000;
+    }
+
+    if (pd.popOut > 0.3) {
+      const pdHeadX = pd.x + pd.width / 2;
+      const pdHeadY = pd.y - pd.popOut * 25;
+
+      const dx = (jimjam.x + jimjam.width / 2) - pdHeadX;
+      const dy = (jimjam.y + jimjam.height / 2) - pdHeadY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 20) {
+        jimjam.x = 50;
+        jimjam.y = 300;
+        jimjam.velocityY = 0;
+        statusDisplay.textContent = 'Yip! Prairie dog surprise!';
+        setTimeout(() => {
+          if (gameState === 'playing') statusDisplay.textContent = '';
+        }, 1500);
+      }
+    }
+  });
+
   // Update tractor beam (level 5)
   if (tractorBeam && currentLevel === 5) {
     if (!tractorBeam.active) {
@@ -930,7 +1099,8 @@ function update() {
       gameState = 'levelComplete';
       const messages = {
         1: 'Level Complete! Time to dive underwater!',
-        2: 'Level Complete! Time to go hiking in the Smokeys!'
+        2: 'Level Complete! Time to go hiking in the Smokeys!',
+        5: 'Level Complete! Time to explore the Black Hills!'
       };
       statusDisplay.textContent = messages[currentLevel] || 'Level Complete!';
       setTimeout(() => {
@@ -1873,6 +2043,176 @@ function drawAlien(alien) {
   ctx.stroke();
 }
 
+function drawBison(b) {
+  if (!b.alive) return;
+
+  const screenX = b.x;
+  const screenY = b.y;
+
+  ctx.save();
+  if (b.direction > 0) {
+    ctx.translate(screenX + b.width, 0);
+    ctx.scale(-1, 1);
+    ctx.translate(-screenX, 0);
+  }
+
+  // Body
+  ctx.fillStyle = '#4a3728';
+  ctx.beginPath();
+  ctx.ellipse(screenX + 35, screenY + 25, 30, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hump
+  ctx.fillStyle = '#3d2e20';
+  ctx.beginPath();
+  ctx.ellipse(screenX + 20, screenY + 12, 18, 15, -0.3, Math.PI, 0);
+  ctx.fill();
+
+  // Head
+  ctx.fillStyle = '#3d2e20';
+  ctx.beginPath();
+  ctx.ellipse(screenX + 8, screenY + 18, 12, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shaggy beard
+  ctx.fillStyle = '#2a1f15';
+  ctx.beginPath();
+  ctx.ellipse(screenX + 5, screenY + 25, 8, 8, 0, 0, Math.PI);
+  ctx.fill();
+
+  // Horns
+  ctx.strokeStyle = '#c9b896';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(screenX + 5, screenY + 10, 6, Math.PI, Math.PI * 1.7);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(screenX + 11, screenY + 10, 6, Math.PI * 1.3, Math.PI * 2);
+  ctx.stroke();
+
+  // Eye
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.arc(screenX + 5, screenY + 16, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Legs with walk animation
+  ctx.fillStyle = '#3d2e20';
+  const legOffset1 = Math.sin(b.walkPhase) * 4;
+  const legOffset2 = Math.sin(b.walkPhase + Math.PI) * 4;
+  ctx.fillRect(screenX + 15, screenY + 38 + legOffset1, 6, 12);
+  ctx.fillRect(screenX + 25, screenY + 38 + legOffset2, 6, 12);
+  ctx.fillRect(screenX + 42, screenY + 38 + legOffset2, 6, 12);
+  ctx.fillRect(screenX + 52, screenY + 38 + legOffset1, 6, 12);
+
+  // Hooves
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(screenX + 14, screenY + 48 + legOffset1, 8, 3);
+  ctx.fillRect(screenX + 24, screenY + 48 + legOffset2, 8, 3);
+  ctx.fillRect(screenX + 41, screenY + 48 + legOffset2, 8, 3);
+  ctx.fillRect(screenX + 51, screenY + 48 + legOffset1, 8, 3);
+
+  // Tail
+  ctx.strokeStyle = '#2a1f15';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(screenX + 65, screenY + 22);
+  ctx.quadraticCurveTo(screenX + 72, screenY + 18 + Math.sin(b.walkPhase * 2) * 3, screenX + 68, screenY + 28);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawPrairieDog(pd) {
+  if (pd.popOut <= 0) {
+    // Just draw the hole
+    ctx.fillStyle = '#2a1a0e';
+    ctx.beginPath();
+    ctx.ellipse(pd.x + pd.width / 2, 348, 15, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a0e05';
+    ctx.beginPath();
+    ctx.ellipse(pd.x + pd.width / 2, 348, 10, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  const popHeight = pd.popOut * 25;
+  const headY = 345 - popHeight;
+  const centerX = pd.x + pd.width / 2;
+
+  // Hole
+  ctx.fillStyle = '#2a1a0e';
+  ctx.beginPath();
+  ctx.ellipse(centerX, 348, 15, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body (clip to not show below ground)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(centerX - 20, 0, 40, 346);
+  ctx.clip();
+
+  // Body
+  ctx.fillStyle = '#c4a265';
+  ctx.beginPath();
+  ctx.ellipse(centerX, headY + 15, 10, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Head
+  ctx.fillStyle = '#d4b275';
+  ctx.beginPath();
+  ctx.ellipse(centerX, headY, 8, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Belly
+  ctx.fillStyle = '#dcc89a';
+  ctx.beginPath();
+  ctx.ellipse(centerX, headY + 17, 7, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  ctx.fillStyle = '#b89255';
+  ctx.beginPath();
+  ctx.arc(centerX - 6, headY - 5, 3, 0, Math.PI * 2);
+  ctx.arc(centerX + 6, headY - 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.arc(centerX - 3, headY - 1, 1.5, 0, Math.PI * 2);
+  ctx.arc(centerX + 3, headY - 1, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Nose
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.arc(centerX, headY + 3, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Little paws when fully up
+  if (pd.popOut > 0.7) {
+    ctx.fillStyle = '#c4a265';
+    ctx.beginPath();
+    ctx.ellipse(centerX - 8, headY + 10, 4, 3, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(centerX + 8, headY + 10, 4, 3, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Dirt ring around hole
+  ctx.fillStyle = '#6b5030';
+  ctx.beginPath();
+  ctx.ellipse(centerX, 348, 16, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#2a1a0e';
+  ctx.beginPath();
+  ctx.ellipse(centerX, 348, 12, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawTractorBeam() {
   if (!tractorBeam || !tractorBeam.active) return;
 
@@ -2510,6 +2850,81 @@ function drawBlanketFort() {
     ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('ESCAPE!', x + 50, ufoY - 15 + hover);
+  } else if (currentLevel === 6) {
+    // MT. RUSHMORE (Level 6)
+    const rushY = y - 20;
+
+    // Mountain face (granite)
+    ctx.fillStyle = '#9e9e9e';
+    ctx.beginPath();
+    ctx.moveTo(x - 10, rushY + 100);
+    ctx.lineTo(x, rushY + 10);
+    ctx.lineTo(x + 25, rushY);
+    ctx.lineTo(x + 50, rushY + 5);
+    ctx.lineTo(x + 75, rushY);
+    ctx.lineTo(x + 100, rushY + 10);
+    ctx.lineTo(x + 110, rushY + 100);
+    ctx.closePath();
+    ctx.fill();
+
+    // Mountain shading
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(x + 55, rushY + 5);
+    ctx.lineTo(x + 110, rushY + 100);
+    ctx.lineTo(x + 75, rushY + 100);
+    ctx.lineTo(x + 50, rushY + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    // Four face outlines (simplified heads)
+    ctx.fillStyle = '#b0b0b0';
+    for (let i = 0; i < 4; i++) {
+      const faceX = x + 8 + i * 24;
+      const faceY = rushY + 15 + Math.sin(i) * 3;
+      // Head shape
+      ctx.beginPath();
+      ctx.ellipse(faceX + 10, faceY + 8, 9, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Face details (eyes and nose lines)
+    ctx.fillStyle = '#808080';
+    for (let i = 0; i < 4; i++) {
+      const faceX = x + 8 + i * 24;
+      const faceY = rushY + 15 + Math.sin(i) * 3;
+      // Eyes
+      ctx.beginPath();
+      ctx.arc(faceX + 7, faceY + 6, 1.5, 0, Math.PI * 2);
+      ctx.arc(faceX + 13, faceY + 6, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Nose
+      ctx.beginPath();
+      ctx.moveTo(faceX + 10, faceY + 7);
+      ctx.lineTo(faceX + 9, faceY + 11);
+      ctx.lineTo(faceX + 11, faceY + 11);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Pine trees at base
+    ctx.fillStyle = '#2d5a27';
+    for (let i = 0; i < 5; i++) {
+      const treeX = x + 5 + i * 22;
+      const treeY = rushY + 75;
+      ctx.beginPath();
+      ctx.moveTo(treeX, treeY);
+      ctx.lineTo(treeX + 8, treeY - 20);
+      ctx.lineTo(treeX + 16, treeY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // "ADVENTURE!" text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('ADVENTURE!', x + 50, rushY - 10);
   }
 }
 
@@ -2540,7 +2955,7 @@ function draw() {
     gradient.addColorStop(0.3, '#2d2520');
     gradient.addColorStop(0.7, '#3d3530');
     gradient.addColorStop(1, '#2a2420');
-  } else {
+  } else if (currentLevel === 5) {
     // White Sands - twilight desert sky
     gradient.addColorStop(0, '#1a1a3a');
     gradient.addColorStop(0.3, '#4a3060');
@@ -2548,6 +2963,12 @@ function draw() {
     gradient.addColorStop(0.7, '#ff7040');
     gradient.addColorStop(0.85, '#ffaa60');
     gradient.addColorStop(1, '#ffe4c4');
+  } else {
+    // Black Hills - blue sky with light clouds
+    gradient.addColorStop(0, '#4a90d9');
+    gradient.addColorStop(0.5, '#87CEEB');
+    gradient.addColorStop(0.8, '#b8d4e8');
+    gradient.addColorStop(1, '#8fbc8f');
   }
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2650,6 +3071,48 @@ function draw() {
     }
   }
 
+  // Black Hills background (Level 6)
+  if (currentLevel === 6) {
+    // Distant pine-covered mountain silhouettes
+    ctx.fillStyle = '#2d4a3a';
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height * 0.75);
+    for (let i = 0; i <= canvas.width; i += 30) {
+      const hillHeight = Math.sin(i * 0.015) * 40 + Math.sin(i * 0.008 + 1) * 25 + Math.cos(i * 0.025) * 15;
+      ctx.lineTo(i, canvas.height * 0.55 + hillHeight);
+    }
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.lineTo(0, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+
+    // Closer hills with pines
+    ctx.fillStyle = '#1e3a2a';
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height * 0.8);
+    for (let i = 0; i <= canvas.width; i += 25) {
+      const hillHeight = Math.sin(i * 0.02 + 2) * 30 + Math.sin(i * 0.01) * 20;
+      ctx.lineTo(i, canvas.height * 0.65 + hillHeight);
+    }
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.lineTo(0, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+
+    // Pine tree silhouettes on the closer hills
+    ctx.fillStyle = '#1a2e20';
+    for (let i = 0; i < canvas.width; i += 35) {
+      const baseY = canvas.height * 0.65 + Math.sin(i * 0.02 + 2) * 30 + Math.sin(i * 0.01) * 20;
+      const treeHeight = 15 + Math.sin(i * 0.1) * 8;
+      ctx.beginPath();
+      ctx.moveTo(i + 5, baseY);
+      ctx.lineTo(i + 10, baseY - treeHeight);
+      ctx.lineTo(i + 15, baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
   // Underwater light rays (Level 2)
   if (currentLevel === 2) {
     ctx.save();
@@ -2672,7 +3135,7 @@ function draw() {
   ctx.translate(-camera.x, 0);
 
   // Clouds (parallax - move slower) - not in cave or desert levels
-  if (currentLevel !== 4 && currentLevel !== 5) {
+  if (currentLevel !== 4 && currentLevel !== 5 && currentLevel !== 6) {
     clouds.forEach(cloud => drawCloud(cloud.x - camera.x * 0.3 + camera.x, cloud.y, cloud.size));
   }
 
@@ -2848,6 +3311,42 @@ function draw() {
           ctx.moveTo(platform.x + i + 82, platform.y - 5);
           ctx.lineTo(platform.x + i + 86, platform.y - 10);
           ctx.stroke();
+        }
+      } else if (currentLevel === 6) {
+        // BLACK HILLS GROUND (Level 6)
+        // Dark earth with grass
+        ctx.fillStyle = '#3d2b1f';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+        // Grass top
+        ctx.fillStyle = '#4a7c3f';
+        ctx.fillRect(platform.x, platform.y, platform.width, 8);
+
+        // Grass tufts
+        ctx.fillStyle = '#5a9c4f';
+        for (let i = 0; i < platform.width; i += 25) {
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i + 5, platform.y);
+          ctx.lineTo(platform.x + i + 8, platform.y - 6);
+          ctx.lineTo(platform.x + i + 11, platform.y);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(platform.x + i + 15, platform.y);
+          ctx.lineTo(platform.x + i + 17, platform.y - 4);
+          ctx.lineTo(platform.x + i + 19, platform.y);
+          ctx.fill();
+        }
+
+        // Small wildflowers
+        for (let i = 0; i < platform.width; i += 150) {
+          ctx.fillStyle = '#e8d44d';
+          ctx.beginPath();
+          ctx.arc(platform.x + i + 60, platform.y - 2, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#d469a8';
+          ctx.beginPath();
+          ctx.arc(platform.x + i + 120, platform.y - 2, 2.5, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
     } else {
@@ -3143,6 +3642,84 @@ function draw() {
         // Fallback for level 5
         ctx.fillStyle = '#fff8f0';
         ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+      } else if (currentLevel === 6 && platform.isGranite) {
+        // GRANITE HILL WITH PINES (Level 6)
+        const centerX = platform.x + platform.width / 2;
+        const baseY = platform.y + platform.height;
+
+        // Granite rock shape (irregular hill)
+        ctx.fillStyle = '#8a8a8a';
+        ctx.beginPath();
+        ctx.moveTo(platform.x - 15, baseY);
+        ctx.lineTo(platform.x - 5, platform.y + 15);
+        ctx.lineTo(platform.x + 10, platform.y + 5);
+        ctx.lineTo(centerX, platform.y);
+        ctx.lineTo(platform.x + platform.width - 10, platform.y + 5);
+        ctx.lineTo(platform.x + platform.width + 5, platform.y + 15);
+        ctx.lineTo(platform.x + platform.width + 15, baseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Rock shading
+        ctx.fillStyle = '#7a7a7a';
+        ctx.beginPath();
+        ctx.moveTo(centerX, platform.y);
+        ctx.lineTo(platform.x + platform.width + 5, platform.y + 15);
+        ctx.lineTo(platform.x + platform.width + 15, baseY);
+        ctx.lineTo(centerX + 5, baseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Rock cracks/texture
+        ctx.strokeStyle = '#6a6a6a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(centerX - 10, platform.y + 10);
+        ctx.lineTo(centerX - 15, platform.y + 30);
+        ctx.moveTo(centerX + 15, platform.y + 8);
+        ctx.lineTo(centerX + 20, platform.y + 25);
+        ctx.stroke();
+
+        // Pine trees on top
+        ctx.fillStyle = '#2d5a27';
+        const numTrees = Math.floor(platform.width / 25);
+        for (let i = 0; i < numTrees; i++) {
+          const treeX = platform.x + 10 + i * 25 + Math.sin(i * 3) * 5;
+          const treeBaseY = platform.y + 5;
+          const treeHeight = 20 + Math.sin(i * 2) * 5;
+
+          // Trunk
+          ctx.fillStyle = '#5a3a1a';
+          ctx.fillRect(treeX + 4, treeBaseY - 5, 4, 8);
+
+          // Pine layers
+          ctx.fillStyle = '#2d5a27';
+          ctx.beginPath();
+          ctx.moveTo(treeX, treeBaseY - 5);
+          ctx.lineTo(treeX + 6, treeBaseY - treeHeight);
+          ctx.lineTo(treeX + 12, treeBaseY - 5);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#3a7a37';
+          ctx.beginPath();
+          ctx.moveTo(treeX + 1, treeBaseY - 10);
+          ctx.lineTo(treeX + 6, treeBaseY - treeHeight + 5);
+          ctx.lineTo(treeX + 11, treeBaseY - 10);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Landing surface indicator
+        ctx.fillStyle = 'rgba(100, 130, 100, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(centerX, platform.y, platform.width / 2 + 5, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (currentLevel === 6) {
+        // Fallback for level 6
+        ctx.fillStyle = '#8a8a8a';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
       }
     }
   });
@@ -3179,6 +3756,12 @@ function draw() {
 
   // Aliens (Level 5)
   aliens.forEach(alien => drawAlien(alien));
+
+  // Bison (Level 6)
+  bison.forEach(b => drawBison(b));
+
+  // Prairie Dogs (Level 6)
+  prairieDogs.forEach(pd => drawPrairieDog(pd));
 
   // Tractor beam (Level 5)
   if (currentLevel === 5) {
@@ -3232,7 +3815,8 @@ function draw() {
       1: 'Time to dive underwater!',
       2: 'Time to go hiking in the Smokeys!',
       3: 'Time to explore the caverns!',
-      4: 'Time to visit White Sands!'
+      4: 'Time to visit White Sands!',
+      5: 'Time to explore the Black Hills!'
     };
     ctx.fillText(levelMessages[currentLevel] || 'Get ready!', canvas.width / 2, canvas.height / 2 + 20);
   }
